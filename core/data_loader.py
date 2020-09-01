@@ -122,13 +122,13 @@ def get_train_loader(root, which='source', img_size=256,
                                batch_size=1,
                                batch_sampler=sampler,
                                num_workers=num_workers,
-                               pin_memory=True )
+                               pin_memory=False )
     else:
         return data.DataLoader(dataset=dataset,
                                batch_size=batch_size,
                                batch_sampler=None,
                                num_workers=num_workers,
-                               pin_memory=True,
+                               pin_memory=False,
                                drop_last=True)
 
 

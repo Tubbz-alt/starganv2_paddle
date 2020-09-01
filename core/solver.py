@@ -13,6 +13,7 @@ from os.path import join as ospj
 import time
 import datetime
 from munch import Munch
+import numpy as np
 
 import paddorch as porch
 import paddorch.nn as nn
@@ -24,6 +25,7 @@ from core.data_loader import InputFetcher
 import core.utils as utils
 from metrics.eval import calculate_metrics
 
+from visualdl import LogWriter
 
 class Solver(nn.Module):
     def __init__(self, args):
@@ -52,11 +54,11 @@ class Solver(nn.Module):
                     weight_decay=args.weight_decay)
 
             self.ckptios = [
-                CheckpointIO(ospj(args.checkpoint_dir, '100000_nets_ema.ckpt'), **self.nets),
-                CheckpointIO(ospj(args.checkpoint_dir, '100000_nets_ema.ckpt'), **self.nets_ema),
-                CheckpointIO(ospj(args.checkpoint_dir, '100000_optims.ckpt'), **self.optims)]
+                CheckpointIO(ospj(args.checkpoint_dir, '{:06d}_nets_ema.ckpt'), **self.nets),
+                CheckpointIO(ospj(args.checkpoint_dir, '{:06d}_nets_ema.ckpt'), **self.nets_ema),
+                CheckpointIO(ospj(args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims)]
         else:
-            self.ckptios = [CheckpointIO(ospj(args.checkpoint_dir, '100000_nets_ema.ckpt'), **self.nets_ema)]
+            self.ckptios = [CheckpointIO(ospj(args.checkpoint_dir, '{:06d}_nets_ema.ckpt'), **self.nets_ema)]
 
         self 
         # for name, network in self.named_children():
@@ -82,6 +84,7 @@ class Solver(nn.Module):
         nets = self.nets
         nets_ema = self.nets_ema
         optims = self.optims
+        writer=LogWriter(logdir=self.args.checkpoint_dir+"/log/")
 
         # fetch random validation images for debugging
         fetcher = InputFetcher(loaders.src, loaders.ref, args.latent_dim, 'train')
@@ -124,7 +127,7 @@ class Solver(nn.Module):
 
             # train the generator
             if i-args.resume_iter>100: ##train discriminator first
-                g_loss, g_losses_latent = compute_g_loss(
+                g_loss, g_losses_latent,sample_1 = compute_g_loss(
                     nets, args, x_real, y_org, y_trg, z_trgs=[z_trg, z_trg2], masks=masks)
                 self._reset_grad()
                 g_loss.backward()
@@ -132,7 +135,7 @@ class Solver(nn.Module):
                 optims.mapping_network.minimize(g_loss)
                 optims.style_encoder.minimize(g_loss)
 
-                g_loss, g_losses_ref = compute_g_loss(
+                g_loss, g_losses_ref,sample_2 = compute_g_loss(
                     nets, args, x_real, y_org, y_trg, x_refs=[x_ref, x_ref2], masks=masks)
                 self._reset_grad()
                 g_loss.backward()
@@ -158,9 +161,11 @@ class Solver(nn.Module):
                                             ['D/latent_', 'D/ref_', 'G/latent_', 'G/ref_']):
                         for key, value in loss.items():
                             all_losses[prefix + key] = value
+                            writer.add_scalar(tag=prefix + key, step=i+1, value=value)
                     all_losses['G/lambda_ds'] = args.lambda_ds
                     log += ' '.join(['%s: [%.4f]' % (key, value) for key, value in all_losses.items()])
                     tqdm_descriptor.set_description(log)
+                    writer.add_image("x_fake", (sample_1*255).numpy().transpose([1,2,0]).astype(np.uint8), i+1 )
 
                 # generate images for debugging
                 if (i+1) % args.sample_every == 0:
@@ -185,8 +190,11 @@ class Solver(nn.Module):
                                             ['D/latent_', 'D/ref_']):
                         for key, value in loss.items():
                             all_losses[prefix + key] = value
+                            writer.add_scalar(tag=prefix + key, step=i+1, value=value)
                     log += ' '.join(['%s: [%.4f]' % (key, value) for key, value in all_losses.items()])
                     tqdm_descriptor.set_description(log)
+                    
+        writer.close()
 
 
     def sample(self, loaders):
@@ -290,7 +298,7 @@ def compute_g_loss(nets, args, x_real, y_org, y_trg, z_trgs=None, x_refs=None, m
     return loss, Munch(adv=loss_adv.numpy().flatten()[0],
                        sty=loss_sty.numpy().flatten()[0],
                        ds=loss_ds.numpy().flatten()[0],
-                       cyc=loss_cyc.numpy().flatten()[0])
+                       cyc=loss_cyc.numpy().flatten()[0]),x_fake[0]
 
 
 def moving_average(model, model_test, beta=0.999):
