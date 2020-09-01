@@ -14,9 +14,9 @@ import time
 import datetime
 from munch import Munch
 
-import paddle_torch as torch
-import paddle_torch.nn as nn
-import paddle_torch.nn.functional as F
+import paddorch as porch
+import paddorch.nn as nn
+import paddorch.nn.functional as F
 
 from core.model import build_model
 from core.checkpoint import CheckpointIO
@@ -30,7 +30,7 @@ class Solver(nn.Module):
         
         super().__init__()
         self.args = args
-        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # self.device = porch.device('cuda' if porch.cuda.is_available() else 'cpu')
         print("Solver init....")
         self.nets, self.nets_ema = build_model(args)
         # below setattrs are to make networks be children of Solver, e.g., for self.to(self.device)
@@ -45,7 +45,7 @@ class Solver(nn.Module):
             for net in self.nets.keys():
                 if net == 'fan':
                     continue
-                self.optims[net] = torch.optim.Adam(
+                self.optims[net] = porch.optim.Adam(
                     params=self.nets[net].parameters(),
                     lr=args.f_lr if net == 'mapping_network' else args.lr,
                     betas=[args.beta1, args.beta2],
@@ -99,7 +99,8 @@ class Solver(nn.Module):
         print('Start training...')
         import tqdm
         start_time = time.time()
-        for i in tqdm.trange(args.resume_iter, args.total_iters):
+        tqdm_descriptor=tqdm.trange(args.resume_iter, args.total_iters)
+        for i in tqdm_descriptor:
             # fetch images and labels
             inputs = next(fetcher)
             x_real, y_org = inputs.x_src, inputs.y_src
@@ -136,6 +137,7 @@ class Solver(nn.Module):
                 self._reset_grad()
                 g_loss.backward()
                 optims.generator.minimize(g_loss)
+          
 
                 # compute moving average of network parameters
                 moving_average(nets.generator, nets_ema.generator, beta=0.999)
@@ -158,7 +160,7 @@ class Solver(nn.Module):
                             all_losses[prefix + key] = value
                     all_losses['G/lambda_ds'] = args.lambda_ds
                     log += ' '.join(['%s: [%.4f]' % (key, value) for key, value in all_losses.items()])
-                    print(log)
+                    tqdm_descriptor.set_description(log)
 
                 # generate images for debugging
                 if (i+1) % args.sample_every == 0:
@@ -184,7 +186,7 @@ class Solver(nn.Module):
                         for key, value in loss.items():
                             all_losses[prefix + key] = value
                     log += ' '.join(['%s: [%.4f]' % (key, value) for key, value in all_losses.items()])
-                    print(log)
+                    tqdm_descriptor.set_description(log)
 
 
     def sample(self, loaders):
@@ -231,7 +233,7 @@ def compute_d_loss(nets, args, x_real, y_org, y_trg, z_trg=None, x_ref=None, mas
     loss_reg = r1_reg(out, x_real)
 
     # with fake images
-    with torch.no_grad():
+    with porch.no_grad():
         if z_trg is not None:
             s_trg = nets.mapping_network(z_trg, y_trg)
         else:  # x_ref is not None
@@ -241,7 +243,7 @@ def compute_d_loss(nets, args, x_real, y_org, y_trg, z_trg=None, x_ref=None, mas
     out = nets.discriminator(x_fake, y_trg)
     loss_fake = adv_loss(out, 0)
 
-    loss = torch.sum(loss_real + loss_fake  + args.lambda_reg * loss_reg)
+    loss = porch.sum(loss_real + loss_fake  + args.lambda_reg * loss_reg)
     return loss, Munch(real=loss_real.numpy().flatten()[0],
                        fake=loss_fake.numpy().flatten()[0],
                        reg=loss_reg )
@@ -266,7 +268,7 @@ def compute_g_loss(nets, args, x_real, y_org, y_trg, z_trgs=None, x_refs=None, m
 
     # style reconstruction loss
     s_pred = nets.style_encoder(x_fake, y_trg)
-    loss_sty = torch.mean(torch.abs(s_pred - s_trg))
+    loss_sty = porch.mean(porch.abs(s_pred - s_trg))
 
     # diversity sensitive loss
     if z_trgs is not None:
@@ -275,13 +277,13 @@ def compute_g_loss(nets, args, x_real, y_org, y_trg, z_trgs=None, x_refs=None, m
         s_trg2 = nets.style_encoder(x_ref2, y_trg)
     x_fake2 = nets.generator(x_real, s_trg2, masks=masks)
     x_fake2 = x_fake2.detach()
-    loss_ds = torch.mean(torch.abs(x_fake - x_fake2))
+    loss_ds = porch.mean(porch.abs(x_fake - x_fake2))
 
     # cycle-consistency loss
     masks = nets.fan.get_heatmap(x_fake) if args.w_hpf > 0 else None
     s_org = nets.style_encoder(x_real, y_org)
     x_rec = nets.generator(x_fake, s_org, masks=masks)
-    loss_cyc = torch.mean(torch.abs(x_rec - x_real))
+    loss_cyc = porch.mean(porch.abs(x_rec - x_real))
 
     loss = loss_adv + args.lambda_sty * loss_sty \
         - args.lambda_ds * loss_ds + args.lambda_cyc * loss_cyc
@@ -293,25 +295,25 @@ def compute_g_loss(nets, args, x_real, y_org, y_trg, z_trgs=None, x_refs=None, m
 
 def moving_average(model, model_test, beta=0.999):
     for param, param_test in zip(model.parameters(), model_test.parameters()):
-         torch.copy(torch.lerp(param, param_test, beta),param_test)
+         porch.copy(porch.lerp(param, param_test, beta),param_test)
 
 
 def adv_loss(logits, target):
     assert target in [1, 0]
-    targets = torch.full_like(logits, fill_value=target)
+    targets = porch.full_like(logits, fill_value=target)
     loss = F.binary_cross_entropy_with_logits(logits, targets)
     return loss
 
 #TODO find a way to implement autograd
 def r1_reg(d_out, x_in):
+    from paddle import fluid
     # zero-centered gradient penalty for real images
-    return 0.0
-    # batch_size = x_in.shape[0]
-    #
-    # d_out_sum=torch.sum(d_out)
-    # d_out_sum.backward()
-    # grad_dout = d_out_sum.gradient()
-    # grad_dout2 = grad_dout.pow(2)
-    # assert(grad_dout2.shape == x_in.shape)
-    # reg = 0.5 * grad_dout2.view(batch_size, -1).sum(1).mean(0)
-    # return reg
+    batch_size = x_in.shape[0]
+    grad_dout = fluid.dygraph.grad(
+        outputs=d_out.sum(), inputs=x_in,
+        create_graph=False, retain_graph=True, only_inputs=True
+    )[0]
+    grad_dout2 = porch.Tensor(grad_dout).pow(2)
+    assert(grad_dout2.shape == x_in.shape)
+    reg = 0.5 * grad_dout2.view(batch_size, -1).sum(1).mean(0)
+    return reg

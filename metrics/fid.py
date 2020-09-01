@@ -11,10 +11,10 @@ Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
 import os
 import argparse
 
-import paddle_torch as torch
-import paddle_torch.nn as nn
+import paddorch as porch
+import paddorch.nn as nn
 import numpy as np
-from paddle_torch.vision.models.inception import InceptionV3
+from paddorch.vision.models.inception import InceptionV3
 from scipy import linalg
 from core.data_loader import get_eval_loader
 
@@ -31,10 +31,10 @@ def frechet_distance(mu, cov, mu2, cov2):
     return np.real(dist)
 
 
-@torch.no_grad()
+@porch.no_grad()
 def calculate_fid_given_paths(paths, img_size=256, batch_size=50):
     print('Calculating FID given paths %s and %s...' % (paths[0], paths[1]))
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = porch.device('cuda' if porch.cuda.is_available() else 'cpu')
     inception =   InceptionV3("./metrics/inception_v3_pretrained.pdparams")
     inception.eval()
     loaders = [get_eval_loader(path, img_size, batch_size) for path in paths]
@@ -43,10 +43,10 @@ def calculate_fid_given_paths(paths, img_size=256, batch_size=50):
     for loader in loaders:
         actvs = []
         for x in tqdm(loader, total=len(loader)):
-            x=torch.varbase_to_tensor(x[0])
+            x=porch.varbase_to_tensor(x[0])
             actv = inception(x )
             actvs.append(actv)
-        actvs = torch.cat(actvs, dim=0).numpy()
+        actvs = porch.cat(actvs, dim=0).numpy()
         mu.append(np.mean(actvs, axis=0))
         cov.append(np.cov(actvs, rowvar=False))
     fid_value = frechet_distance(mu[0], cov[0], mu[1], cov[1])

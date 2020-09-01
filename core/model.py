@@ -13,11 +13,11 @@ import math
 
 from munch import Munch
 import numpy as np
-import paddle_torch as torch
-import paddle_torch.nn as nn
-import paddle_torch.nn.functional as F
+import paddorch as porch
+import paddorch.nn as nn
+import paddorch.nn.functional as F
 
-from paddle_torch.vision.models.wing import FAN
+from paddorch.vision.models.wing import FAN
 
 
 class ResBlk(nn.Module):
@@ -72,9 +72,9 @@ class AdaIN(nn.Module):
 
     def forward(self, x, s):
         h = self.fc(s)
-        h=torch.varbase_to_tensor(h)
+        h=porch.varbase_to_tensor(h)
         h = h.view(h.size(0), h.size(1), 1, 1)
-        gamma, beta = torch.chunk(h, chunks=2, dim=1)
+        gamma, beta = porch.chunk(h, chunks=2, dim=1)
         return (1 + gamma) * self.norm(x) + beta
 
 
@@ -124,7 +124,7 @@ class AdainResBlk(nn.Module):
 class HighPass(nn.Module):
     def __init__(self, w_hpf, device):
         super(HighPass, self).__init__()
-        self.filter = torch.varbase_to_tensor(torch.tensor([[-1, -1, -1],
+        self.filter = porch.varbase_to_tensor(porch.tensor([[-1, -1, -1],
                                     [-1, 8., -1],
                                     [-1, -1, -1]]).to(device) / w_hpf)
 
@@ -167,8 +167,8 @@ class Generator(nn.Module):
                 0, AdainResBlk(dim_out, dim_out, style_dim, w_hpf=w_hpf))
 
         if w_hpf > 0:
-            device = torch.device(
-                'cuda' if torch.cuda.is_available() else 'cpu')
+            device = porch.device(
+                'cuda' if porch.cuda.is_available() else 'cpu')
             self.hpf = HighPass(w_hpf, device)
 
     def forward(self, x, s, masks=None):
@@ -186,7 +186,7 @@ class Generator(nn.Module):
                 mask = masks[0] if x.shape[2] in [32] else masks[1]
                 mask = F.interpolate(mask, size=x.shape[2], mode='bilinear')
                 x = x + self.hpf(mask * cache[x.shape[2]])
-        return torch.varbase_to_tensor(self.to_rgb(x))
+        return porch.varbase_to_tensor(self.to_rgb(x))
 
 
 class MappingNetwork(nn.Module):
@@ -215,9 +215,9 @@ class MappingNetwork(nn.Module):
         out = []
         for layer in self.unshared:
             out += [layer(h)]
-        out = torch.stack(out, dim=1)  # (batch, num_domains, style_dim)
+        out = porch.stack(out, dim=1)  # (batch, num_domains, style_dim)
 
-        s = torch.take(out,list(zip(range(y.shape[0] ),y.numpy().astype(int).tolist() )) )
+        s = porch.take(out,list(zip(range(y.shape[0] ),y.numpy().astype(int).tolist() )) )
         return s
 
     def finetune(self, z, y):
@@ -225,9 +225,9 @@ class MappingNetwork(nn.Module):
         out = []
         for layer in self.unshared:
             out += [layer(h)]
-        out = torch.stack(out, dim=1)  # (batch, num_domains, style_dim)
+        out = porch.stack(out, dim=1)  # (batch, num_domains, style_dim)
 
-        s = torch.take(out, list(zip(range(y.size(0)), y.numpy().astype(int).tolist())))
+        s = porch.take(out, list(zip(range(y.size(0)), y.numpy().astype(int).tolist())))
         return s,h,out
 
 class StyleEncoder(nn.Module):
@@ -255,13 +255,13 @@ class StyleEncoder(nn.Module):
     def forward(self, x, y):
 
         h = self.shared(x)
-        h= torch.varbase_to_tensor(h)
+        h= porch.varbase_to_tensor(h)
         h = h.view(h.size(0), -1)
         out = []
         for layer in self.unshared:
             out += [layer(h)]
-        out = torch.stack(out, dim=1)  # (batch, num_domains, style_dim)
-        s = torch.take(out, list(zip(range(y.shape[0]), y.numpy().astype(int).tolist())))
+        out = porch.stack(out, dim=1)  # (batch, num_domains, style_dim)
+        s = porch.take(out, list(zip(range(y.shape[0]), y.numpy().astype(int).tolist())))
         return s
 
 
@@ -287,11 +287,11 @@ class Discriminator(nn.Module):
     def forward(self, x, y):
 
         out = self.main(x)
-        out=torch.Tensor(out)
+        out=porch.Tensor(out)
         out = out.view(out.size(0), -1)  # (batch, num_domains)
-        idx = torch.LongTensor(np.arange(y.shape[0] ))
+        idx = porch.LongTensor(np.arange(y.shape[0] ))
         # out = out[idx, y]  # (batch)
-        s = torch.take(out, list(zip(range(y.shape[0]), y.numpy().astype(int).tolist())))
+        s = porch.take(out, list(zip(range(y.shape[0]), y.numpy().astype(int).tolist())))
         return s
 
 

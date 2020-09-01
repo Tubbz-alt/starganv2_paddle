@@ -19,19 +19,19 @@ from munch import Munch
 import numpy as np
 import cv2
 from skimage.filters import gaussian
-import paddle_torch as torch
-import paddle_torch.nn as nn
-import paddle_torch.nn.functional as F
-from paddle_torch.vision.models.wing import FaceAligner
-# import torch
-# import torch.nn as nn
-# import torch.nn.functional as F
+import paddorch as porch
+import paddorch.nn as nn
+import paddorch.nn.functional as F
+from paddorch.vision.models.wing import FaceAligner
+# import porch
+# import porch.nn as nn
+# import porch.nn.functional as F
 
 
 
 def align_faces(args, input_dir, output_dir):
     import os
-    from torchvision import transforms
+    from porchvision import transforms
     from PIL import Image
     from core.utils import save_image
 
@@ -64,8 +64,8 @@ def normalize(x, eps=1e-6):
     x = x.contiguous()
     N, C, H, W = x.size()
     x_ = x.view(N*C, -1)
-    max_val = torch.max(x_, dim=1, keepdim=True)[0]
-    min_val = torch.min(x_, dim=1, keepdim=True)[0]
+    max_val = porch.max(x_, dim=1, keepdim=True)[0]
+    min_val = porch.min(x_, dim=1, keepdim=True)[0]
     x_ = (x_ - min_val) / (max_val - min_val + eps)
     out = x_.view(N, C, H, W)
     return out
@@ -73,7 +73,7 @@ def normalize(x, eps=1e-6):
 
 def truncate(x, thres=0.1):
     """Remove small values in heatmaps."""
-    return torch.where(x < thres, torch.zeros_like(x), x)
+    return porch.where(x < thres, porch.zeros_like(x), x)
 
 
 def resize(x, p=2):
@@ -86,18 +86,18 @@ def shift(x, N):
     up = N >= 0
     N = abs(N)
     _, _, H, W = x.size()
-    head = torch.arange(N)
-    tail = torch.arange(H-N)
+    head = porch.arange(N)
+    tail = porch.arange(H-N)
 
     if up:
-        head = torch.arange(H-N)+N
-        tail = torch.arange(N)
+        head = porch.arange(H-N)+N
+        tail = porch.arange(N)
     else:
-        head = torch.arange(N) + (H-N)
-        tail = torch.arange(H-N)
+        head = porch.arange(N) + (H-N)
+        tail = porch.arange(H-N)
 
     # permutation indices
-    perm = torch.cat([head, tail]).to(x.device)
+    perm = porch.cat([head, tail]).to(x.device)
     out = x[:, :, perm, :]
     return out
 
@@ -134,9 +134,9 @@ def preprocess(x):
         start, end = index_map[part]
         x[:, start:end] = resize(shift(x[:, start:end], ops.shift), ops.resize)
 
-    zero_out = torch.cat([torch.arange(0, index_map.chin.start),
-                          torch.arange(index_map.chin.end, 33),
-                          torch.LongTensor([index_map.eyebrowsedges.start,
+    zero_out = porch.cat([porch.arange(0, index_map.chin.start),
+                          porch.arange(index_map.chin.end, 33),
+                          porch.LongTensor([index_map.eyebrowsedges.start,
                                             index_map.eyebrowsedges.end,
                                             index_map.lipedges.start,
                                             index_map.lipedges.end])])
@@ -157,8 +157,8 @@ def preprocess(x):
     x2[:, index_map.lipedges.start:index_map.lipinner.end] = 0  # start:end was 76:96
     x2[:, index_map.eyebrows.start:index_map.eyebrows.end] = 0  # start:end was 33:51
 
-    x = torch.sum(x, dim=1, keepdim=True)  # (N, 1, H, W)
-    x2 = torch.sum(x2, dim=1, keepdim=True)  # mask without faceline and mouth
+    x = porch.sum(x, dim=1, keepdim=True)  # (N, 1, H, W)
+    x2 = porch.sum(x2, dim=1, keepdim=True)  # mask without faceline and mouth
 
     x[x != x] = 0  # set nan to zero
     x2[x != x] = 0  # set nan to zero

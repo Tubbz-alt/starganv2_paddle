@@ -20,17 +20,17 @@ import ffmpeg
 import numpy as np
 
 
-import paddle_torch as torch
-import paddle_torch.nn as nn
-import paddle_torch.nn.functional as F
-import paddle_torch.vision as torchvision
-import paddle_torch.vision.utils as vutils
+import paddorch as porch
+import paddorch.nn as nn
+import paddorch.nn.functional as F
+import paddorch.vision as porchvision
+import paddorch.vision.utils as vutils
 
-# import   torch
-# import torch.nn as nn
-# import torch.nn.functional as F
-# import torchvision
-# import torchvision.utils as vutils
+# import   porch
+# import porch.nn as nn
+# import porch.nn.functional as F
+# import porchvision
+# import porchvision.utils as vutils
 
 
 def save_json(json_file, filename):
@@ -60,7 +60,7 @@ def print_network(network, name):
 
 def denormalize(x):
     out = (x + 1) / 2
-    out=torch.varbase_to_tensor(out)
+    out=porch.varbase_to_tensor(out)
     return out.clamp_(0, 1)
 
 
@@ -84,7 +84,7 @@ def translate_and_reconstruct(nets, args, x_src, y_src, x_ref, y_ref, filename):
     masks = nets.fan.get_heatmap(x_fake) if args.w_hpf > 0 else None
     x_rec = nets.generator(x_fake, s_src, masks=masks)
     x_concat = [x_src, x_ref, x_fake, x_rec]
-    x_concat = torch.cat(x_concat, dim=0)
+    x_concat = porch.cat(x_concat, dim=0)
     save_image(x_concat, N, filename)
     del x_concat
 
@@ -98,19 +98,19 @@ def translate_using_latent(nets, args, x_src, y_trg_list, z_trg_list, psi, filen
     masks = nets.fan.get_heatmap(x_src) if args.w_hpf > 0 else None
 
     for i, y_trg in enumerate(y_trg_list):
-        z_many = torch.randn(10000, latent_dim)
-        y_many = torch.LongTensor(10000).fill_(y_trg[0])
+        z_many = porch.randn(10000, latent_dim)
+        y_many = porch.LongTensor(10000).fill_(y_trg[0])
         s_many = nets.mapping_network(z_many, y_many)
-        s_avg = torch.mean(s_many, dim=0, keepdim=True)
+        s_avg = porch.mean(s_many, dim=0, keepdim=True)
         s_avg = s_avg.repeat(N, 1)
 
         for z_trg in z_trg_list:
             s_trg = nets.mapping_network(z_trg, y_trg)
-            s_trg = torch.lerp(s_avg, s_trg, psi)
+            s_trg = porch.lerp(s_avg, s_trg, psi)
             x_fake = nets.generator(x_src, s_trg, masks=masks)
             x_concat += [x_fake]
 
-    x_concat = torch.cat(x_concat, dim=0)
+    x_concat = porch.cat(x_concat, dim=0)
     save_image(x_concat, N, filename)
 
 def translate_using_reference(nets, args, x_src, x_ref, y_ref, filename):
@@ -119,8 +119,8 @@ def translate_using_reference(nets, args, x_src, x_ref, y_ref, filename):
     x_src.stop_gradient=True
 
     N, C, H, W = x_src.shape
-    wb = torch.ones(1, C, H, W)
-    x_src_with_wb = torch.cat([wb, x_src], dim=0)
+    wb = porch.ones(1, C, H, W)
+    x_src_with_wb = porch.cat([wb, x_src], dim=0)
 
     masks = nets.fan.get_heatmap(x_src) if args.w_hpf > 0 else None
     s_ref = nets.style_encoder(x_ref, y_ref)
@@ -128,10 +128,10 @@ def translate_using_reference(nets, args, x_src, x_ref, y_ref, filename):
     x_concat = [x_src_with_wb]
     for i, s_ref in enumerate(s_ref_list):
         x_fake = nets.generator(x_src, s_ref, masks=masks)
-        x_fake_with_ref = torch.cat([x_ref[i:i+1], x_fake], dim=0)
+        x_fake_with_ref = porch.cat([x_ref[i:i+1], x_fake], dim=0)
         x_concat += [x_fake_with_ref]
 
-    x_concat = torch.cat(x_concat, dim=0)
+    x_concat = porch.cat(x_concat, dim=0)
     save_image(x_concat, N+1, filename)
     del x_concat
 
@@ -151,9 +151,9 @@ def debug_image(nets, args, inputs, step):
     translate_and_reconstruct(nets, args, x_src, y_src, x_ref, y_ref, filename)
 
     # latent-guided image synthesis
-    y_trg_list = [torch.tensor(y).repeat(N)
+    y_trg_list = [porch.tensor(y).repeat(N)
                   for y in range(min(args.num_domains, 5))]
-    z_trg_list = torch.randn(args.num_outs_per_domain, 1, args.latent_dim).repeat(1, N, 1)
+    z_trg_list = porch.randn(args.num_outs_per_domain, 1, args.latent_dim).repeat(1, N, 1)
     for psi in [0.5, 0.7, 1.0]:
         filename = ospj(args.sample_dir, '%06d_latent_psi_%.1f.jpg' % (step, psi))
         translate_using_latent(nets, args, x_src, y_trg_list, z_trg_list, psi, filename)
@@ -184,12 +184,12 @@ def interpolate(nets, args, x_src, s_prev, s_next):
     alphas = get_alphas()
 
     for alpha in alphas:
-        s_ref = torch.lerp(s_prev, s_next, alpha)
+        s_ref = porch.lerp(s_prev, s_next, alpha)
         x_fake = nets.generator(x_src, s_ref, masks=masks)
-        entries = torch.cat([x_src , x_fake ], dim=2)
-        frame = torchvision.utils.make_grid(entries, nrow=B, padding=0, pad_value=-1).unsqueeze(0)
+        entries = porch.cat([x_src , x_fake ], dim=2)
+        frame = porchvision.utils.make_grid(entries, nrow=B, padding=0, pad_value=-1).unsqueeze(0)
         frames.append(frame)
-    frames = torch.cat(frames)
+    frames = porch.cat(frames)
     return frames
 
 
@@ -205,8 +205,8 @@ def slide(entries, margin=32):
     alphas = get_alphas()
     T = len(alphas) # number of frames
 
-    canvas = - torch.ones( T, C, H*2, W + margin )
-    merged = torch.cat(entries, dim=2)  # (1, 3, 512, 256)
+    canvas = - porch.ones( T, C, H*2, W + margin )
+    merged = porch.cat(entries, dim=2)  # (1, 3, 512, 256)
     for t, alpha in enumerate(alphas):
         top = int(H * (1 - alpha))  # top, bottom for canvas
         bottom = H * 2
@@ -226,7 +226,7 @@ def video_ref(nets, args, x_src, x_ref, y_ref, fname):
     s_ref = nets.style_encoder(x_ref, y_ref)
     s_prev = None
     for data_next in tqdm(zip(x_ref, y_ref, s_ref), 'video_ref', len(x_ref)):
-        x_next, y_next, s_next = [torch.varbase_to_tensor(d).unsqueeze(0) for d in data_next]
+        x_next, y_next, s_next = [porch.varbase_to_tensor(d).unsqueeze(0) for d in data_next]
         if s_prev is None:
             x_prev, y_prev, s_prev = x_next, y_next, s_next
             continue
@@ -237,14 +237,14 @@ def video_ref(nets, args, x_src, x_ref, y_ref, fname):
         interpolated = interpolate(nets, args, x_src, s_prev, s_next)
         entries = [x_prev, x_next]
         slided = slide(entries)  # (T, C, 256*2, 256)
-        frames = torch.cat([slided, interpolated], dim=3).cpu()  # (T, C, 256*2, 256*(batch+1))
+        frames = porch.cat([slided, interpolated], dim=3).cpu()  # (T, C, 256*2, 256*(batch+1))
         video.append(frames)
         x_prev, y_prev, s_prev = x_next, y_next, s_next
 
     # append last frame 10 time
     for _ in range(10):
         video.append(frames[-1:])
-    video = tensor2ndarray255(torch.cat(video))
+    video = tensor2ndarray255(porch.cat(video))
     save_video(fname, video)
 
 
@@ -256,15 +256,15 @@ def video_latent(nets, args, x_src, y_list, z_list, psi, fname):
     latent_dim = z_list[0].size(1)
     s_list = []
     for i, y_trg in enumerate(y_list):
-        z_many = torch.randn(10000, latent_dim)
-        y_many = torch.LongTensor(10000).fill_(y_trg[0])
+        z_many = porch.randn(10000, latent_dim)
+        y_many = porch.LongTensor(10000).fill_(y_trg[0])
         s_many = nets.mapping_network(z_many, y_many)
-        s_avg = torch.mean(s_many, dim=0, keepdim=True)
+        s_avg = porch.mean(s_many, dim=0, keepdim=True)
         s_avg = s_avg.repeat(x_src.size(0), 1)
 
         for z_trg in z_list:
             s_trg = nets.mapping_network(z_trg, y_trg)
-            s_trg = torch.lerp(s_avg, s_trg, psi)
+            s_trg = porch.lerp(s_avg, s_trg, psi)
             s_list.append(s_trg)
 
     s_prev = None
@@ -282,7 +282,7 @@ def video_latent(nets, args, x_src, y_list, z_list, psi, fname):
         s_prev = s_next
     for _ in range(10):
         video.append(frames[-1:])
-    video = tensor2ndarray255(torch.cat(video))
+    video = tensor2ndarray255(porch.cat(video))
     save_video(fname, video)
 
 
@@ -302,5 +302,5 @@ def save_video(fname, images, output_fps=30, vcodec='libx264', filters=''):
 
 
 def tensor2ndarray255(images):
-    images = torch.clamp(images * 0.5 + 0.5, 0, 1)
+    images = porch.clamp(images * 0.5 + 0.5, 0, 1)
     return images.cpu().numpy().transpose(0, 2, 3, 1) * 255

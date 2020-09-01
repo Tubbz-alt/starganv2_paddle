@@ -9,7 +9,7 @@ Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
 """
 
 import os
-import paddle_torch as torch
+import paddorch as porch
 
 
 class CheckpointIO(object):
@@ -27,7 +27,7 @@ class CheckpointIO(object):
         outdict = {}
         for name, module in self.module_dict.items():
             outdict[name] = module.state_dict()
-        torch.save(outdict, fname)
+        porch.save(outdict, fname)
 
     def load(self, step):
         fname = self.fname_template.format(step)
@@ -35,10 +35,10 @@ class CheckpointIO(object):
             print(fname + ' does not exist!')
             return
         print('Loading checkpoint from %s...' % fname)
-        if torch.cuda.is_available():
-            module_dict = torch.load(fname)
+        if porch.cuda.is_available():
+            module_dict = porch.load(fname)
         else:
-            module_dict = torch.load(fname, map_location=torch.device('cpu'))
+            module_dict = porch.load(fname, map_location=porch.device('cpu'))
         for name, module in self.module_dict.items():
             if name in module_dict:
                 print(name,"loaded")

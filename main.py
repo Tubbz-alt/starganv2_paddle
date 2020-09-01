@@ -13,7 +13,7 @@ import argparse
 
 from munch import Munch
 from paddle import fluid
-import paddle_torch as torch
+import paddorch as porch
 
 from core.data_loader import get_train_loader
 from core.data_loader import get_test_loader
@@ -186,7 +186,7 @@ if __name__ == '__main__':
     #     for seed in range(1000000):
     #         print("eval seed:",seed)
     #         place = fluid.CUDAPlace(0)
-    #         torch.manual_seed(seed)
+    #         porch.manual_seed(seed)
     #         with fluid.dygraph.guard(place=place):
     #             print("compute device:",place)
     #             fid_mean=main(args)
@@ -194,7 +194,7 @@ if __name__ == '__main__':
     #             fout.flush()
     # place = fluid.CPUPlace()
     place = fluid.CUDAPlace(0)
-    torch.manual_seed(args.seed)
+    porch.manual_seed(args.seed)
     with fluid.dygraph.guard(place=place):
         print("compute device:",place)
         main(args)

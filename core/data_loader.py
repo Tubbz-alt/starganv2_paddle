@@ -17,11 +17,11 @@ from munch import Munch
 from PIL import Image
 import numpy as np
 
-import paddle_torch as torch
-from paddle_torch.utils import data
-from paddle_torch.utils.data.sampler import WeightedRandomSampler
-from paddle_torch.vision import transforms
-from paddle_torch.vision.datasets import ImageFolder
+import paddorch as porch
+from paddorch.utils import data
+from paddorch.utils.data.sampler import WeightedRandomSampler
+from paddorch.vision import transforms
+from paddorch.vision.datasets import ImageFolder
 
 
 
@@ -184,7 +184,7 @@ class InputFetcher:
         self.loader = loader
         self.loader_ref = loader_ref
         self.latent_dim = latent_dim
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = porch.device('cuda' if porch.cuda.is_available() else 'cpu')
         self.mode = mode
 
     def _fetch_inputs(self):
@@ -208,8 +208,8 @@ class InputFetcher:
         x, y = self._fetch_inputs()
         if self.mode == 'train':
             x_ref, x_ref2, y_ref = self._fetch_refs()
-            z_trg = torch.randn(x.shape[0], self.latent_dim)
-            z_trg2 = torch.randn(x.shape[0], self.latent_dim)
+            z_trg = porch.randn(x.shape[0], self.latent_dim)
+            z_trg2 = porch.randn(x.shape[0], self.latent_dim)
             inputs = Munch(x_src=x, y_src=y, y_ref=y_ref,
                            x_ref=x_ref, x_ref2=x_ref2,
                            z_trg=z_trg, z_trg2=z_trg2)

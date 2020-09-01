@@ -14,7 +14,7 @@ from collections import OrderedDict
 from tqdm import tqdm
 
 import numpy as np
-import paddle_torch as torch
+import paddorch as porch
 
 from metrics.fid import calculate_fid_given_paths
 from metrics.lpips import calculate_lpips_given_images
@@ -26,7 +26,7 @@ from core import utils
 def calculate_metrics(nets, args, step, mode):
     print('Calculating evaluation metrics...')
     assert mode in ['latent', 'reference']
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = porch.device('cuda' if porch.cuda.is_available() else 'cpu')
     for name in nets:
         nets[name].eval()
     domains = os.listdir(args.val_img_dir)
@@ -62,16 +62,16 @@ def calculate_metrics(nets, args, step, mode):
                 lpips_values = []
                 print('Generating images and calculating LPIPS for %s...' % task)
                 for i, x_src in enumerate(tqdm(loader_src, total=len(loader_src))):
-                    x_src=torch.varbase_to_tensor(x_src[0])
+                    x_src=porch.varbase_to_tensor(x_src[0])
                     N = x_src.size(0)
-                    y_trg = torch.tensor([trg_idx] * N)
+                    y_trg = porch.tensor([trg_idx] * N)
                     masks = nets.fan.get_heatmap(x_src) if args.w_hpf > 0 else None
 
                     # generate 10 outputs from the same input
                     group_of_images = []
                     for j in range(args.num_outs_per_domain):
                         if mode == 'latent':
-                            z_trg = torch.randn(N, args.latent_dim)
+                            z_trg = porch.randn(N, args.latent_dim)
                             s_trg = nets.mapping_network(z_trg, y_trg)
                         else:
                             try:
@@ -79,7 +79,7 @@ def calculate_metrics(nets, args, step, mode):
                             except:
                                 iter_ref = iter(loader_ref)
                                 x_ref = next(iter_ref)
-                            x_ref=torch.varbase_to_tensor(x_ref[0])
+                            x_ref=porch.varbase_to_tensor(x_ref[0])
                             if x_ref.size(0) > N:
                                 x_ref = x_ref[:N]
                             s_trg = nets.style_encoder(x_ref, y_trg)
