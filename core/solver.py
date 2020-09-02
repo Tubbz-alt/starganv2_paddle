@@ -165,7 +165,7 @@ class Solver(nn.Module):
                     all_losses['G/lambda_ds'] = args.lambda_ds
                     log += ' '.join(['%s: [%.4f]' % (key, value) for key, value in all_losses.items()])
                     tqdm_descriptor.set_description(log)
-                    writer.add_image("x_fake", (sample_1*255).numpy().transpose([1,2,0]).astype(np.uint8), i+1 )
+                    writer.add_image("x_fake", (utils.denormalize(sample_1)*255).numpy().transpose([1,2,0]).astype(np.uint8), i+1 )
 
                 # generate images for debugging
                 if (i+1) % args.sample_every == 0:
@@ -317,11 +317,14 @@ def r1_reg(d_out, x_in):
     from paddle import fluid
     # zero-centered gradient penalty for real images
     batch_size = x_in.shape[0]
-    grad_dout = fluid.dygraph.grad(
-        outputs=d_out.sum(), inputs=x_in,
-        create_graph=False, retain_graph=True, only_inputs=True
-    )[0]
-    grad_dout2 = porch.Tensor(grad_dout).pow(2)
-    assert(grad_dout2.shape == x_in.shape)
-    reg = 0.5 * grad_dout2.view(batch_size, -1).sum(1).mean(0)
-    return reg
+    try:
+        grad_dout = fluid.dygraph.grad(
+            outputs=d_out.sum(), inputs=x_in,
+            create_graph=False, retain_graph=True, only_inputs=True
+        )[0]
+        grad_dout2 = porch.Tensor(grad_dout).pow(2)
+        assert(grad_dout2.shape == x_in.shape)
+        reg = 0.5 * grad_dout2.view(batch_size, -1).sum(1).mean(0)
+        return reg
+    except:
+        return 0.0

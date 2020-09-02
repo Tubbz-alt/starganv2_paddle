@@ -16,7 +16,7 @@ import numpy as np
 import paddorch as porch
 import paddorch.nn as nn
 import paddorch.nn.functional as F
-
+from paddle import fluid
 from paddorch.vision.models.wing import FAN
 
 
@@ -186,7 +186,8 @@ class Generator(nn.Module):
                 mask = masks[0] if x.shape[2] in [32] else masks[1]
                 mask = F.interpolate(mask, size=x.shape[2], mode='bilinear')
                 x = x + self.hpf(mask * cache[x.shape[2]])
-        return porch.varbase_to_tensor(self.to_rgb(x))
+        y=self.to_rgb(x)
+        return porch.varbase_to_tensor(y)
 
 
 class MappingNetwork(nn.Module):
