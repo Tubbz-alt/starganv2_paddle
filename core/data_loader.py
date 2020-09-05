@@ -133,7 +133,7 @@ def get_train_loader(root, which='source', img_size=256,
 
 
 def get_eval_loader(root, img_size=256, batch_size=32,
-                    imagenet_normalize=True, shuffle=True,
+                    imagenet_normalize=True, shuffle=False,
                     num_workers=4, drop_last=False):
     print('Preparing DataLoader for the evaluation phase...')
     if imagenet_normalize:

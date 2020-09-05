@@ -314,6 +314,7 @@ def adv_loss(logits, target):
 
 #TODO find a way to implement autograd
 def r1_reg(d_out, x_in):
+    return 0.0
     from paddle import fluid
     # zero-centered gradient penalty for real images
     batch_size = x_in.shape[0]
