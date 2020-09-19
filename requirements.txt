@@ -1,7 +1,9 @@
 paddlepaddle-gpu==1.8.4.post97
 munch==2.5.0
 ffmpeg
+visualdl
 opencv-python==4.2.0.34
 numpy==1.16.5
 scikit-image
 paddorch
+
