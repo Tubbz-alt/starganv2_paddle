@@ -4,3 +4,4 @@ ffmpeg
 opencv-python==4.2.0.34
 numpy==1.16.5
 scikit-image
+paddorch

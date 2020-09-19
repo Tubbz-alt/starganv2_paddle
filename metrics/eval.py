@@ -62,8 +62,8 @@ def calculate_metrics(nets, args, step, mode):
                 lpips_values = []
                 print('Generating images and calculating LPIPS for %s...' % task)
                 for i, x_src in enumerate(tqdm(loader_src, total=len(loader_src))):
-                    x_src=porch.varbase_to_tensor(x_src[0])
-                    N = x_src.size(0)
+                    x_src=porch.stack(x_src,dim=0) #porch.varbase_to_tensor(x_src[0])
+                    N =  x_src.size(0)
                     y_trg = porch.tensor([trg_idx] * N)
                     masks = nets.fan.get_heatmap(x_src) if args.w_hpf > 0 else None
 
@@ -79,7 +79,7 @@ def calculate_metrics(nets, args, step, mode):
                             except:
                                 iter_ref = iter(loader_ref)
                                 x_ref = next(iter_ref)
-                            x_ref=porch.varbase_to_tensor(x_ref[0])
+                            x_ref=porch.stack(x_ref,dim=0)
                             if x_ref.size(0) > N:
                                 x_ref = x_ref[:N]
                             s_trg = nets.style_encoder(x_ref, y_trg)
